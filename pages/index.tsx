@@ -121,13 +121,8 @@ function isPositionValidAsRook(position: Coord, board: Board): boolean {
     .find((s) => s.x === position.x || s.y === position.y);
 }
 
-function compareCoordinates(c1: Coord, c2: Coord): -1 | 0 | 1 {
-  if (c1.x === c2.x && c1.y == c2.y) return 0;
-  if (c1.y > c2.y) return 1;
-  if (c1.y < c2.y) return -1;
-  if (c1.x > c2.x) return 1;
-  if (c1.x < c2.x) return -1;
-  throw new Error(`Unhandled sorting case: ${JSON.stringify({ c1, c2 })}`);
+function compareCoordinates(c1: Coord, c2: Coord): number {
+  return c1.x - c2.x;
 }
 
 /**
@@ -135,21 +130,13 @@ function compareCoordinates(c1: Coord, c2: Coord): -1 | 0 | 1 {
  * determine which new coordinates *could* have a queen on it.
  */
 function determineCandidatePositions(board: Board): Coord[] {
-  // console.log("Determine Candidate Position");
   const lastQueenPlaced = determineLastQueenPlaced(board);
-  const futurePositions: Coord[] = board.flat().filter((coord) => {
-    // if (lastQueenPlaced === null) {
-    //   const isFuture = coord.x <= board.length / 2 && coord.y <= board.length / 2;
-    //   return isFuture;
-    // }
+  const nextRowPositions: Coord[] = board.flat().filter((coord) => {
     if (lastQueenPlaced === null) return true; // If no queens placed, all squares are viable.
     return compareCoordinates(coord, lastQueenPlaced) === -1;
   });
 
-  const candidatePositions = futurePositions.filter((p) => isPositionValid(p, board));
-  // console.log("candidates", candidatePositions);
-  // console.log("last queen", lastQueenPlaced);
-
+  const candidatePositions = nextRowPositions.filter((p) => isPositionValid(p, board));
   return candidatePositions;
 }
 
@@ -169,23 +156,13 @@ function determineLastQueenPlaced(board: Board): Coord | null {
 /**
  * Given an intermediate board state, return all children solutions
  */
-function getSolutions(currentBoard: Board, usedSquares: boolean[][], depth = 0): Board[] {
-  // console.log("GET SOLUTIONS");
-  // recursive on itself, appends current solutions to children solutions
-
+function getSolutions(currentBoard: Board): Board[] {
   const candidates = determineCandidatePositions(currentBoard);
 
   const solutionBoards: Board[] = candidates
     .map((coordinate) => {
-      if (usedSquares[coordinate.x][coordinate.y]) {
-        // console.log("already used", coordinate);
-        // return [];
-      }
-      usedSquares[coordinate.x][coordinate.y] = true;
-
       const newBoard = addQueen(currentBoard, coordinate);
-      console.log(depth, "New Queen:", coordinate.y + coordinate.x * currentBoard.length);
-      return getSolutions(newBoard, usedSquares, depth + 1);
+      return getSolutions(newBoard);
     })
     .flat();
 
@@ -194,20 +171,20 @@ function getSolutions(currentBoard: Board, usedSquares: boolean[][], depth = 0):
 
 function addQueen(board: Board, coord: Coord): Board {
   const newBoard = cloneBoard(board);
+  // @ts-expect-error we'll trust this array access.
   const square = newBoard[coord.x][coord.y];
   if (!square) throw new Error(`Square not found for coord: ${JSON.stringify(coord)}`);
   if (square.x !== coord.x || square.y !== coord.y) {
     throw new Error("Jacob, you messed up the row <-> col order");
   }
+  // @ts-expect-error we'll trust this array access, also.
   newBoard[coord.x][coord.y].hasQueen = true;
   return newBoard;
 }
 
 function determineNQueensSolutions(n: number) {
-  console.log("___N QUEENS___: ", n);
   const emptyBoard: Board = makeBoard(n);
-  const usedSquaresEmpty = new Array(n).fill(new Array(n).fill(false));
-  return getSolutions(emptyBoard, usedSquaresEmpty).filter(
+  return getSolutions(emptyBoard).filter(
     // (b) => true
     (board) => board.flat().filter((s) => s.hasQueen).length === n
   );
